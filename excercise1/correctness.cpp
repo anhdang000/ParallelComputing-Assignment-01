@@ -8,13 +8,9 @@
 #include <algorithm>
 #include <iomanip>
 #include <cassert>
-#include "lock.h"  // Include the lock library
+#include "lock.h"
 
-// ---------------------------------------------------------------
-// Testing Framework
-// ---------------------------------------------------------------
 
-// Shared counter for testing correctness
 class Counter {
 private:
     int value = 0;
@@ -29,7 +25,6 @@ public:
     }
 };
 
-// Test correctness using a shared counter
 template<typename LockType>
 void test_correctness(LockType& lock, int num_threads, int iterations_per_thread) {
     Counter counter;
@@ -37,7 +32,6 @@ void test_correctness(LockType& lock, int num_threads, int iterations_per_thread
 
     auto worker = [&](int id) {
         for (int i = 0; i < iterations_per_thread; i++) {
-            // Use std::lock_guard equivalent for the lock type
             if constexpr (std::is_same_v<LockType, MCSLock>) {
                 MCSLock::Node node;
                 lock.lock(node);
@@ -51,17 +45,15 @@ void test_correctness(LockType& lock, int num_threads, int iterations_per_thread
         }
     };
 
-    // Create threads
     for (int i = 0; i < num_threads; i++) {
         threads.emplace_back(worker, i);
     }
 
-    // Join threads
     for (auto& t : threads) {
         t.join();
     }
 
-    // Verify correctness
+    // verify correctness
     int expected = num_threads * iterations_per_thread;
     int actual = counter.get();
     
@@ -74,7 +66,7 @@ void test_correctness(LockType& lock, int num_threads, int iterations_per_thread
     assert(expected == actual);
 }
 
-// Benchmark performance
+// Benchmark
 template<typename LockType>
 double benchmark(LockType& lock, int num_threads, int iterations_per_thread, int critical_section_work) {
     std::vector<std::thread> threads;
@@ -82,23 +74,17 @@ double benchmark(LockType& lock, int num_threads, int iterations_per_thread, int
 
     auto worker = [&](int id) {
         for (int i = 0; i < iterations_per_thread; i++) {
-            // Use std::lock_guard equivalent for the lock type
             if constexpr (std::is_same_v<LockType, MCSLock>) {
                 MCSLock::Node node;
                 lock.lock(node);
-                
-                // Critical section with some work
                 counter.increment();
-                // Simulate work in critical section
                 for (volatile int j = 0; j < critical_section_work; j++) {}
                 
                 lock.unlock(node);
             } else {
                 lock.lock();
                 
-                // Critical section with some work
                 counter.increment();
-                // Simulate work in critical section
                 for (volatile int j = 0; j < critical_section_work; j++) {}
                 
                 lock.unlock();
@@ -108,12 +94,10 @@ double benchmark(LockType& lock, int num_threads, int iterations_per_thread, int
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    // Create threads
     for (int i = 0; i < num_threads; i++) {
         threads.emplace_back(worker, i);
     }
 
-    // Join threads
     for (auto& t : threads) {
         t.join();
     }
@@ -125,10 +109,9 @@ double benchmark(LockType& lock, int num_threads, int iterations_per_thread, int
 }
 
 int main() {
-    // Set test parameters
     const int NUM_THREADS[] = {1, 2, 4, 8, 16};
     const int ITERATIONS_PER_THREAD = 100000;
-    const int CRITICAL_SECTION_WORK = 10; // Adjustable work size
+    const int CRITICAL_SECTION_WORK = 10;
     
     std::cout << "Testing Spin Lock Implementations" << std::endl;
     std::cout << "=================================" << std::endl;
@@ -178,14 +161,5 @@ int main() {
         std::cout << std::setw(15) << ttas_time;
         std::cout << std::setw(15) << mcs_time << std::endl;
     }
-    
-    // Print observations
-    std::cout << "\nObservations:" << std::endl;
-    std::cout << "------------" << std::endl;
-    std::cout << "1. TAS (Test-and-Set): Simple implementation but suffers from cache line contention" << std::endl;
-    std::cout << "2. TTAS (Test-and-Test-and-Set): Reduces memory traffic by testing before attempting lock acquisition" << std::endl;
-    std::cout << "3. MCS: Queue-based approach that eliminates contention by having threads spin on local variables" << std::endl;
-    std::cout << "   MCS scales better with high thread counts but has higher overhead for low contention scenarios" << std::endl;
-    
     return 0;
 }
