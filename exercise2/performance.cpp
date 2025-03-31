@@ -105,10 +105,12 @@ double benchmarkStdBarrier(int num_threads, int num_iterations)
 
 int main()
 {
-  const int num_threads = 4;
+  const int num_threads = 10;
   const int num_iterations = 1000000;
 
   // Benchmark performance
+  std::cout << "Number of threads: " << num_threads << std::endl;
+  std::cout << "Number of iterations: " << num_iterations << std::endl;
   std::cout << "Benchmarking barrier implementation...\n";
   std::cout << "Sense-Reversing Barrier time: " << benchmarkMyBarrier(num_threads, num_iterations) << " seconds\n";
   std::cout << "Standard Barrier time: " << benchmarkStdBarrier(num_threads, num_iterations) << " seconds\n";
