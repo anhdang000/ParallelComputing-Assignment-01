@@ -73,7 +73,7 @@ public:
 
   int64_t get() const override
   {
-    return value.load(std::memory_order_acquire);
+    return value.load();
   }
 };
 
@@ -86,12 +86,12 @@ private:
 public:
   void increment() override
   {
-    value.fetch_add(1, std::memory_order_release);
+    value.fetch_add(1);
   }
 
   int64_t get() const override
   {
-    return value.load(std::memory_order_acquire);
+    return value.load();
   }
 };
 
@@ -165,7 +165,7 @@ double benchmarkCounter(Counter &counter, int num_threads, int operations_per_th
 
 int main()
 {
-  const int num_threads = 10;
+  const int num_threads = 4;
   const int operations_per_thread = 1000000;
 
   // Create counter instances

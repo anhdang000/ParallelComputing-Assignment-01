@@ -10,7 +10,7 @@ performance:
 	./performance
 
 performance-u:
-	g++ -std=c++20 -pthread performance.cpp my_barrier.cpp -o performance
+	g++-13 -std=c++20 -pthread performance.cpp my_barrier.cpp -o performance
 	./performance
 
 clean:
