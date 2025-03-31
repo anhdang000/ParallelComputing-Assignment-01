@@ -62,12 +62,8 @@ public:
     int delay = 1;
     while (true)
     {
-      // int64_t current = value.load(std::memory_order_relaxed);
       int64_t current = value.load();
-      // strong means that the operation will not fail for spurious reasons
-      if (value.compare_exchange_strong(current, current + 1)) //,
-                                                               // std::memory_order_release,
-                                                               // std::memory_order_relaxed))
+      if (value.compare_exchange_strong(current, current + 1))
       {
         break;
       }
