@@ -3,34 +3,30 @@
 #include <vector>
 #include <atomic>
 #include <chrono>
-#include "lock.h"  // Includes TASLock, TTASLock, MCSLock
+#include "lock.h"
 
-// Configuration parameters
-#define NUM_OF_THREADS 4    // Number of concurrent threads
-#define NUM_OF_ITERS   1000 // Iterations per thread
-#define OUTSIDE_WORK   0    // Controls contention: 0 = all work in critical section
-#define N              1000 // Number for primality test
+#define NUM_OF_THREADS 4
+#define NUM_OF_ITERS   10000000
+#define OUTSIDE_WORK   10
+#define N              10000000
 
-// Shared variable
-std::atomic<int> counter{0};  // Counts critical section executions
+std::atomic<int> counter{0};
 
-// Primality test function (work simulation)
 int is_prime(int p) {
-    if (p <= 1) return 0;  // Handle non-prime cases
+    if (p <= 1) return 0;
     for (int d = 2; d < p; d++) {
         if (p % d == 0) return 0;
     }
     return 1;
 }
 
-// Thread function
 template <typename LockType>
 void thread_entry(LockType& lock) {
     for (int i = 0; i < NUM_OF_ITERS; ++i) {
-        lock.acquire();     // Enter critical section
-        is_prime(N);        // Simulate work
-        counter.fetch_add(1, std::memory_order_relaxed);  // Update shared counter
-        lock.release();     // Exit critical section
+        lock.acquire();
+        is_prime(N);
+        counter.fetch_add(1, std::memory_order_relaxed);
+        lock.release();
 
         // Non-critical section work
         for (int j = 0; j < OUTSIDE_WORK; ++j) {
@@ -39,11 +35,10 @@ void thread_entry(LockType& lock) {
     }
 }
 
-// Function to run the benchmark for a specific lock type
 template <typename LockType>
 double run_benchmark() {
     LockType lock;
-    counter = 0;  // Reset counter
+    counter = 0;
 
     std::vector<std::thread> threads;
     auto start = std::chrono::high_resolution_clock::now();
@@ -62,8 +57,10 @@ double run_benchmark() {
 }
 
 int main() {
-    // Run benchmark for TAS Lock
     double tas_time = run_benchmark<TASLock>();
+    std::cout << "Outside work: " << OUTSIDE_WORK << std::endl;
+
+    // TAS Lock
     std::cout << "TAS Lock - Total time: " << tas_time << " seconds" << std::endl;
     int expected = NUM_OF_THREADS * NUM_OF_ITERS;
     if (counter == expected) {
@@ -72,7 +69,7 @@ int main() {
         std::cout << "TAS Lock - Counter incorrect: " << counter << " (expected " << expected << ")" << std::endl;
     }
 
-    // Run benchmark for TTAS Lock
+    // TTAS Lock
     double ttas_time = run_benchmark<TTASLock>();
     std::cout << "TTAS Lock - Total time: " << ttas_time << " seconds" << std::endl;
     if (counter == expected) {
@@ -81,7 +78,7 @@ int main() {
         std::cout << "TTAS Lock - Counter incorrect: " << counter << " (expected " << expected << ")" << std::endl;
     }
 
-    // Run benchmark for MCS Lock
+    // MCS Lock
     double mcs_time = run_benchmark<MCSLock>();
     std::cout << "MCS Lock - Total time: " << mcs_time << " seconds" << std::endl;
     if (counter == expected) {
