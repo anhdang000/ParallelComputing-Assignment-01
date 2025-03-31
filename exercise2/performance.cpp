@@ -5,98 +5,7 @@
 #include <iostream>
 #include <algorithm>
 #include <barrier>
-
-class SenseReversingBarrier
-{
-private:
-  std::atomic<int> count;
-  std::atomic<bool> sense;
-  const int num_threads;
-  thread_local static bool my_sense;
-
-  void backoff(int &delay)
-  {
-    std::this_thread::sleep_for(std::chrono::microseconds(delay));
-    delay = std::min(delay * 2, 1000); // Cap at 1ms
-  }
-
-public:
-  SenseReversingBarrier(int n) : count(n), sense(true), num_threads(n) {}
-
-  void wait()
-  {
-    // Use relaxed memory order initially for local sense read,
-    // acquire semantics will be needed later when checking global sense.
-    bool my_sense_local = my_sense;
-
-    // Use acq_rel for fetch_sub: acquire ensures visibility of previous barrier's
-    // sense flip, release ensures visibility of this decrement before the potential
-    // sense flip by this thread if it's the last one.
-    // count = 1 means the last thread to arrive
-    if (count.fetch_sub(1, std::memory_order_acq_rel) == 1)
-    {
-      // Reset count. Use relaxed as it's guarded by the sense flip.
-      count.store(num_threads, std::memory_order_relaxed);
-
-      // Use release semantics to ensure prior writes (like count reset) are visible
-      // before other threads see the flipped sense.
-      sense.store(!my_sense_local, std::memory_order_release);
-    }
-    else
-    {
-      int delay = 1;
-      // Wait for the sense to flip by last thread
-      while (sense.load(std::memory_order_acquire) == my_sense_local)
-      {
-        backoff(delay);
-      }
-    }
-
-    // Flip local sense for next phase
-    my_sense = !my_sense_local;
-  }
-};
-
-// Initialize thread-local variable
-thread_local bool SenseReversingBarrier::my_sense = true;
-
-bool testBarrier(int num_threads, int num_iterations)
-{
-  std::vector<std::thread> threads;
-  std::atomic<int> shared_counter{0};
-  std::atomic<bool> start{false};
-  // std::atomic<bool> test_failed{false}; // No longer needed for intermediate check
-  SenseReversingBarrier barrier(num_threads);
-
-  for (int i = 0; i < num_threads; ++i)
-  {
-    // Pass necessary variables by reference/value correctly
-    threads.emplace_back([&barrier, &shared_counter, num_threads, num_iterations, &start]()
-                         { 
-            while (!start.load(std::memory_order_acquire)) { // Use acquire load for start flag
-                std::this_thread::yield();
-            }
-            for (int j = 0; j < num_iterations; ++j) {
-                // Work before barrier
-                shared_counter.fetch_add(1, std::memory_order_relaxed); // Relaxed is fine for counter
-
-                barrier.wait(); 
-
-                // Work after barrier (if any) 
-                // The removed check was here. No intermediate check needed for basic barrier correctness.
-            } });
-  }
-
-  start.store(true, std::memory_order_release); // Use release store for start flag
-  for (auto &thread : threads)
-  {
-    thread.join();
-  }
-
-  // Final check: Did all expected increments occur?
-  return shared_counter.load() == num_threads * num_iterations;
-}
-
+#include "my_barrier.h"
 // Benchmark function for our barrier
 double benchmarkMyBarrier(int num_threads, int num_iterations)
 {
@@ -198,12 +107,6 @@ int main()
 {
   const int num_threads = 4;
   const int num_iterations = 1000000;
-
-  // Test correctness
-  std::cout << "Testing Sense-Reversing Barrier implementation...\n";
-  std::cout << "Number of threads: " << num_threads << "\n";
-  std::cout << "Number of iterations: " << num_iterations << "\n";
-  std::cout << "Test result: " << (testBarrier(num_threads, num_iterations) ? "PASSED" : "FAILED") << "\n\n";
 
   // Benchmark performance
   std::cout << "Benchmarking barrier implementation...\n";
